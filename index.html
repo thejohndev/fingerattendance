@@ -792,7 +792,6 @@
     }
 
     const sorted = [...filtered].sort((a, b) => b.timestamp - a.timestamp);
-    console.log(sorted)
     tbody.innerHTML = sorted.slice(0, 200).map((r, i) => `
       <tr class="${i === 0 && r._new ? 'flash' : ''}">
         <td><span class="td-name">${getName(r.id)}</span></td>
@@ -939,35 +938,32 @@
   initNamesListener();
 
   onChildAdded(ref(db, 'attendance'), (snapshot) => {
-  const data = snapshot.val();
-  if (!data) return;
+    const data = snapshot.val();
+    if (!data) return;
 
-  // If this ID already exists in allRecords for any date, skip it
-  const alreadySeen = allRecords.some(r => String(r.id) === String(data.id));
-  if (alreadySeen) return;
+    const record = {
+      key: snapshot.key,
+      id: data.id,
+      device: data.device || 'Unknown',
+      timestamp: data.timestamp || Date.now(),
+      _new: !firstLoad
+    };
 
-  const record = {
-    key: snapshot.key,
-    id: data.id,
-    device: data.device || 'Unknown',
-    timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now(),
-    _new: !firstLoad
-  };
+    allRecords.push(record);
+    hourlyData[new Date(record.timestamp).getHours()]++;
 
-  allRecords.push(record);
-  hourlyData[new Date(record.timestamp).getHours()]++;
+    if (!firstLoad) {
+      showToast(`${getName(record.id)} checked in`, `Finger #${String(record.id).padStart(3,'0')} · ${formatTime(record.timestamp)}`);
+      connBar.classList.remove('hidden');
+      setTimeout(() => connBar.classList.add('hidden'), 1500);
+    }
 
-  if (!firstLoad) {
-    showToast(`${getName(record.id)} checked in`, `Finger #${String(record.id).padStart(3,'0')} · ${formatTime(record.timestamp)}`);
-    connBar.classList.remove('hidden');
-    setTimeout(() => connBar.classList.add('hidden'), 1500);
-  }
+    renderTable();
+    renderFeed();
+    renderStats();
+    renderChart();
+  });
 
-  renderTable();
-  renderFeed();
-  renderStats();
-  renderChart();
-});
   setTimeout(() => { firstLoad = false; }, 2000);
 
   // Refresh time-agos every 30s
@@ -997,6 +993,7 @@
       list.innerHTML = `<div class="nm-empty">No names registered yet.</div>`;
       return;
     }
+
     list.innerHTML = entries.map(([id, name]) => `
       <div class="nm-item">
         <div class="nm-item-num">${id}</div>
